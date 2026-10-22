@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Download, Share2, Trash2, Shield, Calendar, User, Hash, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, FileText, Download, Share2, Trash2, Shield, Calendar, User, Hash, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { apiRequest } from '../api/client';
 
 const CATEGORIES = [
@@ -11,7 +11,7 @@ const CATEGORIES = [
   'General Confidential',
 ];
 
-export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload }) {
+export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload, refreshTrigger }) {
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -26,8 +26,8 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
       if (search) params.append('search', search);
       if (selectedCategory !== 'All') params.append('category', selectedCategory);
 
-      const query = params.toString() ? `?${params.toString()}` : '';
-      const data = await apiRequest(`/documents${query}`, { activeUser });
+      const query = params.toString() ? '?' + params.toString() : '';
+      const data = await apiRequest('/documents' + query, { activeUser });
       setDocuments(data.documents || []);
     } catch (err) {
       setAlert({ type: 'error', message: err.message });
@@ -38,11 +38,11 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
 
   useEffect(() => {
     loadDocuments();
-  }, [activeUser, selectedCategory]);
+  }, [activeUser?.email, selectedCategory, refreshTrigger]);
 
   const handleDownload = async (doc) => {
     try {
-      const res = await apiRequest(`/documents/${doc.id}/download`, { activeUser });
+      const res = await apiRequest('/documents/' + doc.id + '/download', { activeUser });
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -53,23 +53,23 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      setAlert({ type: 'success', message: `Downloaded: ${doc.title}` });
+      setAlert({ type: 'success', message: 'Downloaded: ' + doc.title });
     } catch (err) {
-      setAlert({ type: 'error', message: `Download Rejected: ${err.message}` });
+      setAlert({ type: 'error', message: 'Download Rejected: ' + err.message });
     }
   };
 
   const handleDelete = async (doc) => {
-    if (!window.confirm(`Are you sure you want to delete "${doc.title}"? This will archive the document while preserving the audit trail.`)) {
+    if (!window.confirm('Are you sure you want to delete "' + doc.title + '"? This will archive the document while preserving the audit trail.')) {
       return;
     }
 
     try {
-      await apiRequest(`/documents/${doc.id}`, {
+      await apiRequest('/documents/' + doc.id, {
         method: 'DELETE',
         activeUser,
       });
-      setAlert({ type: 'success', message: `Deleted and archived: ${doc.title}` });
+      setAlert({ type: 'success', message: 'Deleted and archived: ' + doc.title });
       loadDocuments();
     } catch (err) {
       setAlert({ type: 'error', message: err.message });
@@ -77,11 +77,19 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-[480px]">
       {/* Search & Filters */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Protected Documents</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-white tracking-tight">Protected Documents</h2>
+            {isLoading && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Syncing Vault...</span>
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Zero-leak vault. Showing documents governed by your active credentials ({activeUser?.role}).
           </p>
@@ -107,11 +115,11 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+            className={'px-3 py-1 rounded-lg text-xs font-medium transition-colors ' + (
               selectedCategory === cat
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700'
-            }`}
+            )}
           >
             {cat}
           </button>
@@ -121,11 +129,11 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
       {/* Alert Banner */}
       {alert && (
         <div
-          className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+          className={'p-3 rounded-xl border text-xs flex items-center justify-between ' + (
             alert.type === 'error'
               ? 'bg-red-500/10 border-red-500/20 text-red-400'
               : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-          }`}
+          )}
         >
           <div className="flex items-center gap-2">
             {alert.type === 'error' ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle className="w-4 h-4 shrink-0" />}
@@ -137,13 +145,28 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
         </div>
       )}
 
-      {/* Document Grid */}
-      {isLoading ? (
-        <div className="text-center py-16 text-slate-500 text-sm">
-          Querying secure vault repository...
+      {/* Document Grid with Stable Height and Skeleton Loader */}
+      {isLoading && documents.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[380px]">
+          {[1, 2, 3].map((n) => (
+            <div
+              key={n}
+              className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-5 flex flex-col justify-between h-56 animate-pulse"
+            >
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="h-4 w-24 bg-slate-800 rounded"></div>
+                  <div className="h-4 w-12 bg-slate-800 rounded"></div>
+                </div>
+                <div className="h-5 w-3/4 bg-slate-800 rounded"></div>
+                <div className="h-3 w-1/2 bg-slate-800/60 rounded"></div>
+              </div>
+              <div className="h-8 bg-slate-800/60 rounded-xl mt-4"></div>
+            </div>
+          ))}
         </div>
       ) : documents.length === 0 ? (
-        <div className="text-center py-16 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-8">
+        <div className="min-h-[350px] flex flex-col items-center justify-center text-center py-16 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-8">
           <FileText className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-slate-300">No Documents Found</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
@@ -157,7 +180,7 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[380px] transition-opacity duration-200 ' + (isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
           {documents.map((doc) => {
             const isOwner = doc.effective_permission === 'owner';
             const canEdit = isOwner || doc.effective_permission === 'edit';
@@ -174,13 +197,13 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
                       {doc.category}
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                      className={'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ' + (
                         isOwner
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                           : doc.effective_permission === 'edit'
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                      }`}
+                      )}
                     >
                       {doc.effective_permission || 'VIEW'}
                     </span>
@@ -209,7 +232,7 @@ export default function DocumentListView({ activeUser, onOpenShare, onOpenUpload
                       <span>{new Date(doc.created_at).toLocaleDateString()}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500 truncate" title={`SHA-256 Checksum: ${doc.sha256_hash}`}>
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500 truncate" title={'SHA-256 Checksum: ' + doc.sha256_hash}>
                       <Hash className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                       <span className="truncate">{doc.sha256_hash}</span>
                     </div>

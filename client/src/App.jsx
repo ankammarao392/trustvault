@@ -44,8 +44,8 @@ export default function App() {
         onOpenUpload={() => setIsUploadOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content Area - Fixed minimum viewport height prevents scrollbar flicker */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-140px)]">
         {/* Active Persona Context Banner */}
         <div className="mb-6 bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -70,18 +70,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* Dynamic Views */}
+        {/* Dynamic Views - Without component-teardown keys to eliminate unmount flickering */}
         {activeTab === 'documents' ? (
           <DocumentListView
-            key={`${activeUser.email}-${refreshTrigger}`}
             activeUser={activeUser}
+            refreshTrigger={refreshTrigger}
             onOpenShare={(doc) => setShareDoc(doc)}
             onOpenUpload={() => setIsUploadOpen(true)}
           />
         ) : (
           <AuditTrailView
-            key={`audit-${activeUser.email}-${refreshTrigger}`}
             activeUser={activeUser}
+            refreshTrigger={refreshTrigger}
           />
         )}
       </main>
@@ -111,7 +111,7 @@ export default function App() {
             <span>Zero IDOR leakage &bull; Obfuscated UUID storage &bull; Append-only audit integrity</span>
           </div>
           <div className="flex items-center gap-4 text-[11px]">
-            <span>FastAPI/Node `.js` Core</span>
+            <span>FastAPI/Node Express Core</span>
             <span>&bull;</span>
             <span>Tailwind CSS</span>
             <span>&bull;</span>

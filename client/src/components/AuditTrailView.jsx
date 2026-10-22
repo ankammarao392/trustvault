@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, ShieldCheck, ShieldAlert, Search, RefreshCw, Filter } from 'lucide-react';
+import { Activity, ShieldCheck, ShieldAlert, Search, RefreshCw, Filter, Loader2 } from 'lucide-react';
 import { apiRequest } from '../api/client';
 
-export default function AuditTrailView({ activeUser }) {
+export default function AuditTrailView({ activeUser, refreshTrigger }) {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,8 +19,8 @@ export default function AuditTrailView({ activeUser }) {
       if (filterAction) params.append('action', filterAction);
       if (filterStatus) params.append('status', filterStatus);
 
-      const query = params.toString() ? `?${params.toString()}` : '';
-      const data = await apiRequest(`/audit-logs${query}`, { activeUser });
+      const query = params.toString() ? '?' + params.toString() : '';
+      const data = await apiRequest('/audit-logs' + query, { activeUser });
       setLogs(data.logs || []);
     } catch (err) {
       setError(err.message);
@@ -31,7 +31,7 @@ export default function AuditTrailView({ activeUser }) {
 
   useEffect(() => {
     loadLogs();
-  }, [activeUser, filterAction, filterStatus]);
+  }, [activeUser?.email, filterAction, filterStatus, refreshTrigger]);
 
   const getActionBadge = (action) => {
     switch (action) {
@@ -51,7 +51,7 @@ export default function AuditTrailView({ activeUser }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-[480px]">
       {/* Title & Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -60,6 +60,12 @@ export default function AuditTrailView({ activeUser }) {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               IMMUTABLE
             </span>
+            {isLoading && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Refreshing...</span>
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Cryptographically timestamped, append-only security logs for all access, downloads, and permission mutations.
@@ -71,18 +77,18 @@ export default function AuditTrailView({ activeUser }) {
           disabled={isLoading}
           className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl border border-slate-700 transition-all self-start"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={'w-3.5 h-3.5 ' + (isLoading ? 'animate-spin' : '')} />
           <span>Refresh Trail</span>
         </button>
       </div>
 
       {error ? (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-3">
+        <div className="min-h-[350px] p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">Access Restricted</p>
-            <p className="text-amber-400/90 mt-0.5">{error}</p>
-            <p className="mt-2 text-slate-400">
+            <p className="font-semibold text-sm">Access Restricted</p>
+            <p className="text-amber-400/90 mt-1">{error}</p>
+            <p className="mt-3 text-slate-400 leading-relaxed">
               Tip: Switch to the <strong>Chief Compliance Admin</strong> using the top persona bar to view system-wide audit records.
             </p>
           </div>
@@ -131,7 +137,7 @@ export default function AuditTrailView({ activeUser }) {
           </div>
 
           {/* Table */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className={'bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl min-h-[380px] transition-opacity duration-200 ' + (isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-950/60 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
@@ -147,8 +153,8 @@ export default function AuditTrailView({ activeUser }) {
                 <tbody className="divide-y divide-slate-800/60 text-slate-300">
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-slate-500 italic">
-                        No audit records found matching criteria.
+                      <td colSpan={6} className="px-4 py-16 text-center text-slate-500 italic">
+                        {isLoading ? 'Loading audit records...' : 'No audit records found matching criteria.'}
                       </td>
                     </tr>
                   ) : (
@@ -157,19 +163,19 @@ export default function AuditTrailView({ activeUser }) {
                       return (
                         <tr
                           key={log.id}
-                          className={`hover:bg-slate-800/30 transition-colors ${
+                          className={'hover:bg-slate-800/30 transition-colors ' + (
                             isDenied ? 'bg-red-500/5' : ''
-                          }`}
+                          )}
                         >
                           <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-slate-400">
                             {new Date(log.created_at).toLocaleString()}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            <span className={'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ' + (
                               isDenied
                                 ? 'bg-red-500/10 text-red-400 border-red-500/20'
                                 : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            }`}>
+                            )}>
                               {isDenied ? (
                                 <>
                                   <ShieldAlert className="w-3 h-3" />
@@ -184,7 +190,7 @@ export default function AuditTrailView({ activeUser }) {
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${getActionBadge(log.action)}`}>
+                            <span className={'px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ' + getActionBadge(log.action)}>
                               {log.action}
                             </span>
                           </td>

@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+/* Lock scrollbar gutter to completely prevent layout shift & scrollbar flickering */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+body {
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
