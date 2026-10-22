@@ -2,6 +2,7 @@
   "name": "trustvault",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "TrustVault: Zero-Trust Confidential Document Governance Platform",
   "scripts": {
     "dev:server": "pnpm --dir server dev",
