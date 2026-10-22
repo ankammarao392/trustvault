@@ -177,12 +177,25 @@ test('TrustVault Security Test Suite: Complete Isolation & Audit Guarantees', as
     assert.equal(res.status, 403, 'Revocation must take effect immediately with 403 Forbidden');
   });
 
-  await t.test('9. Admin can inspect system-wide audit logs with all events accounted for', async () => {
+  await t.test('9. Unauthorized user CANNOT delete Sarah confidential document', async () => {
+    const res = await request(`/api/documents/${confidentialDocId}`, {
+      method: 'DELETE',
+      headers: { 'x-simulated-email': 'viewer@trustvault.internal' },
+    });
+
+    assert.equal(res.status, 403, 'Unauthorized viewer must be blocked from deleting document');
+    
+    // Verify document still exists in database and is not deleted
+    const doc = db.prepare('SELECT is_deleted FROM documents WHERE id = ?').get(confidentialDocId);
+    assert.equal(doc.is_deleted, 0, 'Document must not be deleted');
+  });
+
+  await t.test('10. Admin can inspect system-wide audit logs with all events accounted for', async () => {
     const res = await request(`/api/audit-logs`, {
       headers: { 'x-simulated-email': 'admin@trustvault.internal' },
     });
 
     assert.equal(res.status, 200, 'Admin can view system audit logs');
-    assert.ok(res.data.logs.length >= 3, 'Audit logs must contain multiple recorded events');
+    assert.ok(res.data.logs.length >= 4, 'Audit logs must contain multiple recorded events');
   });
 });
