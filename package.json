@@ -1,0 +1,22 @@
+{
+  "name": "trustvault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TrustVault: Zero-Trust Confidential Document Governance Platform",
+  "scripts": {
+    "dev:server": "pnpm --dir server dev",
+    "dev:client": "pnpm --dir client dev",
+    "start:server": "pnpm --dir server start",
+    "build:client": "pnpm --dir client build",
+    "test": "pnpm --dir server test"
+  },
+  "keywords": [
+    "security",
+    "zero-trust",
+    "rbac",
+    "audit-trail",
+    "least-privilege",
+    "documents"
+  ],
+  "license": "MIT"
+}
