@@ -12,11 +12,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enable security headers & CORS
+const allowedOrigins = process.env.CLIENT_URL
+  ? [process.env.CLIENT_URL, 'http://localhost:5173']
+  : '*';
+
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-simulated-email'],
 }));
+
+// Clean any redundant duplicate slashes (e.g. //documents -> /documents)
+app.use((req, res, next) => {
+  req.url = req.url.replace(/\/{2,}/g, '/');
+  next();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -24,14 +34,19 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize SQLite database
 initDatabase();
 
-// Mount API routes
+// Mount API routes under /api (Standard)
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/documents/:id/permissions', permissionRoutes);
 app.use('/api/audit-logs', auditRoutes);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Fallback aliases in case client calls without /api prefix
+app.use('/auth', authRoutes);
+app.use('/documents', documentRoutes);
+app.use('/audit-logs', auditRoutes);
+
+// Health check endpoints
+app.get(['/', '/api', '/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     service: 'TrustVault Core Engine',

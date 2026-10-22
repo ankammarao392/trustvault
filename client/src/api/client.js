@@ -1,4 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
+// Sanitize API_BASE to automatically handle missing /api or trailing slashes
+function getNormalizedApiBase() {
+  let base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').trim();
+  // Strip trailing slashes
+  base = base.replace(/\/+$/, '');
+  // If user omitted /api, automatically append it
+  if (!base.endsWith('/api')) {
+    base = `${base}/api`;
+  }
+  return base;
+}
+
+const API_BASE = getNormalizedApiBase();
 
 export async function apiRequest(endpoint, { method = 'GET', body, headers = {}, activeUser } = {}) {
   const reqHeaders = { ...headers };
@@ -12,7 +24,11 @@ export async function apiRequest(endpoint, { method = 'GET', body, headers = {},
     reqHeaders['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  // Ensure clean single slash between base and endpoint
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${cleanEndpoint}`.replace(/([^:]\/)\/+/g, '$1');
+
+  const res = await fetch(url, {
     method,
     headers: reqHeaders,
     body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
@@ -29,12 +45,14 @@ export async function apiRequest(endpoint, { method = 'GET', body, headers = {},
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || 'API Request failed');
+    // Strip raw HTML tags if an HTML error page was returned
+    const cleanError = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    throw new Error(cleanError || `Server returned error (${res.status})`);
   }
 
   return res;
 }
 
 export function getDownloadUrl(documentId, userEmail) {
-  return `${API_BASE}/documents/${documentId}/download`;
+  return `${API_BASE}/documents/${documentId}/download`.replace(/([^:]\/)\/+/g, '$1');
 }
