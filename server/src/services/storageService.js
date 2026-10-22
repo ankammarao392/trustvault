@@ -6,16 +6,29 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Support persistent volume path in production (e.g. Render Disk mounted at /var/data or /data)
-const defaultVaultDir = path.join(__dirname, '..', 'vault_blobs');
-const VAULT_DIR = process.env.DATA_DIR
-  ? path.join(process.env.DATA_DIR, 'vault_blobs')
-  : defaultVaultDir;
+// Safely resolve vault blobs directory with graceful fallback if permission denied
+function resolveVaultDir() {
+  if (process.env.DATA_DIR) {
+    try {
+      const target = path.join(process.env.DATA_DIR, 'vault_blobs');
+      if (!fs.existsSync(target)) {
+        fs.mkdirSync(target, { recursive: true });
+      }
+      fs.accessSync(target, fs.constants.W_OK);
+      return target;
+    } catch (err) {
+      console.warn(`[TrustVault Warning] DATA_DIR/vault_blobs is not accessible (${err.message}). Falling back to local storage.`);
+    }
+  }
 
-// Ensure vault directory exists
-if (!fs.existsSync(VAULT_DIR)) {
-  fs.mkdirSync(VAULT_DIR, { recursive: true });
+  const localTarget = path.join(__dirname, '..', 'vault_blobs');
+  if (!fs.existsSync(localTarget)) {
+    fs.mkdirSync(localTarget, { recursive: true });
+  }
+  return localTarget;
 }
+
+const VAULT_DIR = resolveVaultDir();
 
 /**
  * Persists an uploaded file buffer into secure storage and returns metadata

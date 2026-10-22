@@ -7,12 +7,24 @@ import bcrypt from 'bcryptjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Support persistent volume path in production (e.g. Render Disk mounted at /var/data or /data)
-const dataDir = process.env.DATA_DIR || __dirname;
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+// Safely resolve data directory with graceful fallback if permission denied
+function resolveDataDir() {
+  if (process.env.DATA_DIR) {
+    try {
+      const target = process.env.DATA_DIR;
+      if (!fs.existsSync(target)) {
+        fs.mkdirSync(target, { recursive: true });
+      }
+      fs.accessSync(target, fs.constants.W_OK);
+      return target;
+    } catch (err) {
+      console.warn(`[TrustVault Warning] DATA_DIR "${process.env.DATA_DIR}" is not accessible (${err.message}). Falling back to local project storage.`);
+    }
+  }
+  return __dirname;
 }
 
+const dataDir = resolveDataDir();
 const dbPath = path.join(dataDir, 'trustvault.db');
 export const db = new Database(dbPath);
 
