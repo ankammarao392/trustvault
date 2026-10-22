@@ -5,7 +5,12 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const VAULT_DIR = path.join(__dirname, '..', 'vault_blobs');
+
+// Support persistent volume path in production (e.g. Render Disk mounted at /var/data or /data)
+const defaultVaultDir = path.join(__dirname, '..', 'vault_blobs');
+const VAULT_DIR = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'vault_blobs')
+  : defaultVaultDir;
 
 // Ensure vault directory exists
 if (!fs.existsSync(VAULT_DIR)) {
